@@ -1,28 +1,35 @@
 # Render Blueprint for Kanban Tools.
 # Docs: https://render.com/docs/blueprint-spec
 #
-# This deploys the existing Dockerfile as a web service with a persistent disk
-# for job files. Render injects PORT (default 10000); the app already binds it
-# via the PORT/HOSTNAME env vars baked into the Dockerfile/next standalone server.
+# This deploys the existing Dockerfile as a web service. Render injects PORT
+# (default 10000); the app binds it via the PORT/HOSTNAME env baked into the
+# Dockerfile/next standalone server.
 #
-# To use: push this repo to GitHub, then in Render → "New +" → "Blueprint" and
-# point it at the repo. Render reads this file and provisions everything.
+# FREE TIER configuration:
+#  - No persistent disk (free plan can't mount one), so job files live in the
+#    container's ephemeral /tmp and are lost on restart/redeploy/sleep. That's
+#    fine: jobs are short-lived and auto-deleted anyway. Downloads just need to
+#    happen reasonably soon after conversion.
+#  - The free service SLEEPS after ~15 min idle and cold-starts on the next
+#    request (first hit can take ~30-60s). Upgrade to a paid plan + add a disk
+#    later for always-on + durable files.
+#
+# To use: in Render -> "New +" -> "Blueprint" and point it at this repo.
 
 services:
   - type: web
     name: kanban-tools
     runtime: docker
     dockerfilePath: ./Dockerfile
-    plan: starter # 512MB/0.5CPU is the floor for media work; bump to standard for big files
+    plan: free
     healthCheckPath: /api/health
     autoDeploy: true
-    # Render sets PORT; the app reads it. HOSTNAME 0.0.0.0 is already in the image.
     envVars:
       - key: NODE_ENV
         value: production
-      # Point job storage at the mounted persistent disk.
+      # Ephemeral storage on the free tier (no mounted disk).
       - key: CONVERT_JOBS_DIR
-        value: /data/convert-jobs
+        value: /tmp/convert-jobs
       - key: MAX_FILE_SIZE_MB
         value: "512"
       - key: JOB_TTL_MINUTES
@@ -35,13 +42,9 @@ services:
         value: yt-dlp
       - key: LOG_LEVEL
         value: info
-      # Keep concurrency modest on small instances to avoid OOM.
+      # Keep concurrency low on the small free instance to avoid OOM.
       - key: WORKER_CONCURRENCY
-        value: "2"
-      # Disk quota guard a bit under the mounted disk size (see disk: below).
+        value: "1"
+      # Disk quota guard sized for the small ephemeral /tmp on free instances.
       - key: MAX_TOTAL_DISK_BYTES
-        value: "8589934592" # 8 GB (disk is 10 GB)
-    disk:
-      name: jobs-data
-      mountPath: /data
-      sizeGB: 10
+        value: "1073741824" # 1 GB
