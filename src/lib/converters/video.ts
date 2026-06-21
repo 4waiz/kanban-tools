@@ -13,7 +13,7 @@ import type {
 } from "../types";
 
 /**
- * Video / audio converter — backed by FFmpeg.
+ * Video / audio converter - backed by FFmpeg.
  *
  *   Video → MP4 (H.264 + AAC)
  *   Video → WebM (VP9 + Opus)

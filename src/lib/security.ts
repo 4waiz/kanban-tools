@@ -109,7 +109,7 @@ export function isValidToken(token: string): boolean {
 
 /**
  * Classify an IP literal (v4 or v6) as private / loopback / link-local /
- * reserved — i.e. something the link downloader must never connect to. Pure and
+ * reserved - i.e. something the link downloader must never connect to. Pure and
  * synchronous so it can be unit-tested; the DNS-resolving wrapper lives in
  * ssrf.ts and feeds resolved addresses through here.
  */

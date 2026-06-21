@@ -207,7 +207,7 @@ async function getPdfPageCount(srcPath: string): Promise<number> {
     const m = res.stdout.match(/Pages:\s+(\d+)/);
     if (m) return Math.max(1, Math.min(2000, parseInt(m[1], 10)));
   } catch {
-    /* pdfinfo not available — fall through */
+    /* pdfinfo not available - fall through */
   }
   // Conservative cap so a malformed file can't spin forever.
   return 50;

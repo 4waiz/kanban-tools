@@ -3,7 +3,7 @@ import { ToolsGrid } from "@/components/tools-grid";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata = {
-  title: "Tools — Kanban Tools",
+  title: "Tools - Kanban Tools",
   description:
     "Every conversion tool in one place: PDF, images, video, audio, archives, and public links.",
 };
@@ -19,7 +19,7 @@ export default function ToolsPage() {
           Pick a tool, get a clean result
         </h1>
         <p className="mt-3 text-muted-foreground">
-          Each tool opens the same fast workflow — drop a file (or paste a link),
+          Each tool opens the same fast workflow - drop a file (or paste a link),
           tune the options, and download. Tools that need a native dependency are
           marked if it isn’t installed.
         </p>

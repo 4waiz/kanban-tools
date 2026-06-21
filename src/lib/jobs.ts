@@ -217,7 +217,7 @@ export async function recoverInterruptedJobs(): Promise<number> {
         memory.set(job.id, job);
       }
     } catch {
-      /* unreadable metadata — leave for the cleanup sweep */
+      /* unreadable metadata - leave for the cleanup sweep */
     }
   }
   if (recovered > 0) {
@@ -265,7 +265,7 @@ export async function sweepExpiredJobs(now = Date.now()): Promise<number> {
         removed++;
       }
     } catch {
-      // No/invalid metadata — fall back to directory mtime.
+      // No/invalid metadata - fall back to directory mtime.
       try {
         const stat = await fs.stat(safeJoin(config.jobsDir, name));
         if (now - stat.mtimeMs > config.jobTtlMs) {

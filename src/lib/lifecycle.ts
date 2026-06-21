@@ -8,7 +8,7 @@ import { drainQueue } from "./runner";
  * Process lifecycle: startup tasks and graceful shutdown.
  *
  * Invoked once from `instrumentation.ts` (Next.js's server-bootstrap hook), so
- * everything here runs a single time per process — not lazily per request as the
+ * everything here runs a single time per process - not lazily per request as the
  * first version did. Idempotent via a globalThis guard to survive dev reloads.
  *
  * Startup:

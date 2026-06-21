@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Kanban Tools — design tokens.
+ * Kanban Tools - design tokens.
  *
  * Derived from the BRIDGE "bridge-deck" system:
  *   ink/slate  #3d4451   →  used for dark surfaces + primary text on light
@@ -90,7 +90,7 @@
 }
 
 /*
- * BRIDGE motif helpers — small, reusable structural pieces from the deck system.
+ * BRIDGE motif helpers - small, reusable structural pieces from the deck system.
  * These keep the "command-center" identity consistent across pages.
  */
 @layer components {
@@ -108,7 +108,7 @@
     @apply absolute left-0 top-0 bottom-0 w-[5px] bg-primary;
   }
 
-  /* Status pills — flat, chip-like, matching the deck "chip" motif. */
+  /* Status pills - flat, chip-like, matching the deck "chip" motif. */
   .pill {
     @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide;
   }

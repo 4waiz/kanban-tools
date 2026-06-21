@@ -2,7 +2,7 @@
   "name": "kanban-tools",
   "version": "0.1.0",
   "private": true,
-  "description": "Kanban Tools — an all-in-one minimal file conversion and download utility.",
+  "description": "Kanban Tools - an all-in-one minimal file conversion and download utility.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

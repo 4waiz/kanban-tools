@@ -3,7 +3,7 @@ import { JobDetail } from "@/components/job-detail";
 import { JobTokenLoader } from "@/components/job-token-loader";
 
 export const metadata = {
-  title: "Job — Kanban Tools",
+  title: "Job - Kanban Tools",
 };
 
 /**

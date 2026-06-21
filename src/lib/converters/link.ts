@@ -26,7 +26,7 @@ import type {
  *  - We DO NOT bypass DRM, paywalls, logins, private accounts, or any access
  *    control. There is no cookie/credential passing, no auth, no DRM handling.
  *  - Two supported modes only:
- *      1) Direct downloadable file URLs (Content-Type is a real file) — streamed
+ *      1) Direct downloadable file URLs (Content-Type is a real file) - streamed
  *         server-side with a hard byte cap.
  *      2) Public media pages that yt-dlp supports for legal public content.
  *  - Anything that looks protected, private, or unsupported returns a polite,

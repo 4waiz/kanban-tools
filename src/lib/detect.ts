@@ -5,9 +5,9 @@ import { getExtension } from "./security";
  * Input type detection.
  *
  * We combine three signals, most-trusted first:
- *  1. Magic bytes (file signature) — can't be spoofed by renaming.
- *  2. The client-provided MIME type — convenient but spoofable.
- *  3. The file extension — last resort.
+ *  1. Magic bytes (file signature) - can't be spoofed by renaming.
+ *  2. The client-provided MIME type - convenient but spoofable.
+ *  3. The file extension - last resort.
  *
  * The goal is a coarse `InputKind` (image/pdf/video/audio/archive) plus a
  * best-guess MIME string; converters refine from there.

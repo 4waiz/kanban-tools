@@ -21,7 +21,7 @@ import type { ConvertContext, OutputFileInfo } from "./types";
  * Job runner + the singleton work queue.
  *
  * Conversions are CPU/RAM heavy (FFmpeg, Sharp, Ghostscript). Running them
- * fire-and-forget in the request process — as the first cut did — lets a burst
+ * fire-and-forget in the request process - as the first cut did - lets a burst
  * of uploads exhaust the machine. Instead we funnel every job through a single
  * bounded WorkQueue: at most `WORKER_CONCURRENCY` run at once, with a bounded
  * backlog that applies backpressure.
@@ -64,7 +64,7 @@ export { QueueFullError };
 /**
  * Enqueue a job for processing. Throws QueueFullError synchronously if the
  * backlog is full (the caller maps that to HTTP 503). The returned promise
- * resolves when the job finishes, but callers typically don't await it — they
+ * resolves when the job finishes, but callers typically don't await it - they
  * poll job status instead.
  */
 export function enqueueJob(jobId: string): Promise<void> {

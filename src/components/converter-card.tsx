@@ -283,7 +283,7 @@ export function ConverterCard({
         className,
       )}
     >
-      {/* Mode switch — files vs URL */}
+      {/* Mode switch - files vs URL */}
       <div className="flex items-center gap-1 border-b border-border p-2">
         <ModeTab
           active={mode === "files"}
@@ -449,7 +449,7 @@ export function ConverterCard({
                         {o.description ? (
                           <span className="text-muted-foreground">
                             {" "}
-                            — {o.description}
+                            - {o.description}
                           </span>
                         ) : null}
                       </SelectItem>
@@ -517,7 +517,7 @@ export function ConverterCard({
             <p className="text-xs text-muted-foreground">
               {uploadPct < 100 && mode === "files"
                 ? `Uploading ${uploadPct}%`
-                : `Working ${job?.progress ?? 0}% — files auto-delete when done.`}
+                : `Working ${job?.progress ?? 0}% - files auto-delete when done.`}
             </p>
           </div>
         )}

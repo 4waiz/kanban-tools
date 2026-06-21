@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Kanban Tools — multi-stage Dockerfile
+# Kanban Tools - multi-stage Dockerfile
 #
 # Produces a small runtime image that includes the native tools the converters
 # rely on: FFmpeg (video/audio), Poppler (PDF→image/SVG), Ghostscript (PDF

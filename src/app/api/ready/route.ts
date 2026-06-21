@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/ready — readiness probe.
+ * GET /api/ready - readiness probe.
  * Verifies the service can actually do work right now: the jobs directory is
  * writable, and we have disk headroom. Returns 503 when not ready so a load
  * balancer can drain this instance. Also reports queue depth for observability.

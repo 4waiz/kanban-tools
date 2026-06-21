@@ -2,7 +2,7 @@
  * Static catalog of tools shown on the /tools page. Each entry deep-links to the
  * home converter with a preset operation. `accept` narrows the file picker.
  *
- * These are presentation metadata only — the real capabilities come from the
+ * These are presentation metadata only - the real capabilities come from the
  * converter registry. Keep labels aligned with converter output ids.
  */
 
@@ -190,7 +190,7 @@ export const TOOLS: ToolDef[] = [
   {
     slug: "universal-converter",
     title: "Universal converter",
-    description: "Drop anything — we detect the type and show what’s possible.",
+    description: "Drop anything - we detect the type and show what’s possible.",
     category: "Links",
     icon: "Sparkles",
   },

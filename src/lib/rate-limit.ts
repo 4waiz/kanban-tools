@@ -78,7 +78,7 @@ export function clientKey(req: Request): string {
  * jobs for per-client concurrency limits without persisting raw IP addresses.
  */
 export function hashedClientKey(req: Request): string {
-  // Lightweight FNV-1a hash — we only need a stable opaque bucket id, not crypto.
+  // Lightweight FNV-1a hash - we only need a stable opaque bucket id, not crypto.
   const ip = clientKey(req);
   let h = 0x811c9dc5;
   for (let i = 0; i < ip.length; i++) {

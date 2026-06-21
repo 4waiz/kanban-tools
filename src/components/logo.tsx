@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 /**
  * Kanban Tools wordmark.
  *
- * Original mark — deliberately NOT any EDGE Group logo or trademark. It mirrors
+ * Original mark - deliberately NOT any EDGE Group logo or trademark. It mirrors
  * the bridge-deck identity (flat slate + a single orange accent block) without
  * borrowing protected assets. The square "command-center" glyph uses the brand
  * orange; the wordmark uses currentColor so it inverts cleanly in dark mode.
@@ -46,10 +46,10 @@ export function LogoGlyph({ className }: { className?: string }) {
         rx="7"
         className="fill-ink dark:fill-ink-2"
       />
-      {/* three "lanes" — a nod to a kanban board, in white */}
+      {/* three "lanes" - a nod to a kanban board, in white */}
       <rect x="7" y="8" width="4.2" height="16" rx="1.4" fill="#ffffff" opacity="0.92" />
       <rect x="14" y="8" width="4.2" height="11" rx="1.4" fill="#ffffff" opacity="0.7" />
-      {/* the active lane / accent — brand orange */}
+      {/* the active lane / accent - brand orange */}
       <rect x="21" y="8" width="4.2" height="16" rx="1.4" className="fill-brand" />
     </svg>
   );

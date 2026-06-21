@@ -13,7 +13,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Kanban Tools — Convert, compress, download",
+  title: "Kanban Tools - Convert, compress, download",
   description:
     "An all-in-one minimal file conversion and download utility. Convert anything. Compress anything. Download what you’re allowed to keep.",
   applicationName: "Kanban Tools",

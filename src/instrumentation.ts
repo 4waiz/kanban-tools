@@ -1,5 +1,5 @@
 /**
- * Next.js instrumentation hook — runs once when the server process boots.
+ * Next.js instrumentation hook - runs once when the server process boots.
  *
  * We use it to run startup tasks (crash recovery, cleanup worker) and register
  * graceful-shutdown handlers exactly once, instead of lazily on the first

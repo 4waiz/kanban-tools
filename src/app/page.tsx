@@ -35,7 +35,7 @@ export default function HomePage() {
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
             Drop a file or paste a link. Kanban Tools detects the type, shows what’s
-            possible, and hands you a clean, downloadable result — fast, private,
+            possible, and hands you a clean, downloadable result - fast, private,
             and auto-cleaned.
           </p>
         </section>

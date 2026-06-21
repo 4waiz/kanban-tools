@@ -42,7 +42,7 @@ function write(key: string, value: unknown) {
     // Notify same-tab listeners (storage event only fires cross-tab).
     window.dispatchEvent(new Event("kanban-tools:store"));
   } catch {
-    /* quota / disabled storage — ignore */
+    /* quota / disabled storage - ignore */
   }
 }
 

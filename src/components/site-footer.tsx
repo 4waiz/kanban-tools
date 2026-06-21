@@ -11,7 +11,7 @@ export function SiteFooter() {
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <Logo showWordmark={false} className="opacity-80" />
           <span>
-            Kanban Tools — local file conversion utility. Files auto-delete after
+            Kanban Tools - local file conversion utility. Files auto-delete after
             processing.
           </span>
         </div>

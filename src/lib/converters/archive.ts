@@ -22,7 +22,7 @@ import type {
  *   ZIP extract   : safe, streaming extraction with zip-bomb guards.
  *   Files → ZIP   : bundle the uploaded files/folders into a single archive.
  *
- * SECURITY (extraction) — every protection the prompt calls for:
+ * SECURITY (extraction) - every protection the prompt calls for:
  *  - Reject absolute paths and any entry that resolves outside the target dir
  *    (Zip Slip / path traversal).
  *  - Cap total uncompressed bytes, entry count, and per-stream size.
@@ -197,7 +197,7 @@ export function safeExtractZip(
         const unixMode = entry.externalFileAttributes >>> 16;
         const S_IFLNK = 0o120000;
         if ((unixMode & 0o170000) === S_IFLNK) {
-          // Don't extract symlinks — count and move on.
+          // Don't extract symlinks - count and move on.
           zip.readEntry();
           return;
         }
@@ -230,7 +230,7 @@ export function safeExtractZip(
 
           // Meter bytes with a pass-through Transform so we enforce the real
           // (not header-claimed) uncompressed size + compression ratio WITHOUT
-          // consuming the stream — a plain `data` listener would steal chunks
+          // consuming the stream - a plain `data` listener would steal chunks
           // before the file write, truncating the output.
           const meter = new Transform({
             transform(chunk: Buffer, _enc, cb) {

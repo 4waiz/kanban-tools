@@ -34,3 +34,6 @@ yarn-error.log*
 # local job storage (temp conversion files)
 /tmp/convert-jobs/
 convert-jobs/
+
+# local docker compose overrides (machine-specific port maps, etc.)
+docker-compose.override.yml

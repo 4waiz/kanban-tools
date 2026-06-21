@@ -12,7 +12,7 @@ import { archiveConverter } from "./archive";
 import { linkConverter } from "./link";
 
 /**
- * Converter registry — the single place converters are wired in.
+ * Converter registry - the single place converters are wired in.
  *
  * To add a new converter: implement the `Converter` contract in a new file and
  * append it here. Detection + output discovery + execution all flow through

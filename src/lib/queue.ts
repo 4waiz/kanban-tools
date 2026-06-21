@@ -7,7 +7,7 @@ import { logger } from "./logger";
  * Why this exists: the MVP ran conversions fire-and-forget in the request
  * handler, so N concurrent uploads could spawn N FFmpeg/Sharp processes and
  * exhaust CPU/RAM. This queue caps concurrency and bounds the backlog, giving
- * predictable resource usage on a single node — the standard pattern before you
+ * predictable resource usage on a single node - the standard pattern before you
  * reach for an external queue (Redis/BullMQ) at multi-node scale.
  *
  * Guarantees:

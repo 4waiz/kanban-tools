@@ -4,7 +4,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/health — liveness probe.
+ * GET /api/health - liveness probe.
  * Cheap and dependency-free: if the process can serve this, it's alive. Use for
  * container/orchestrator liveness checks (restart on failure).
  */

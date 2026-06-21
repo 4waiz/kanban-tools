@@ -8,8 +8,8 @@ outputs, converts/compresses/resizes/extracts, and hands you a clean,
 downloadable result. Files are processed in isolated per-job folders and
 auto-deleted after a short window.
 
-The UI follows a precise, futuristic “command-center” aesthetic — flat slate +
-a single orange accent, generous spacing, light/dark mode — adapted from the
+The UI follows a precise, futuristic “command-center” aesthetic - flat slate +
+a single orange accent, generous spacing, light/dark mode - adapted from the
 *bridge-deck* design system.
 
 > **Production-ready, single-node.** Conversions run through a **bounded worker
@@ -18,21 +18,21 @@ a single orange accent, generous spacing, light/dark mode — adapted from the
 > deploy doesn’t kill in-flight jobs, and there are **liveness/readiness**
 > probes, **structured JSON logs**, **security headers**, **disk + concurrency
 > quotas**, and **DNS-resolving SSRF protection**. Scaling to multiple instances
-> additionally needs a shared store/queue (Redis/BullMQ) — see **Scaling out**.
+> additionally needs a shared store/queue (Redis/BullMQ) - see **Scaling out**.
 
 ---
 
 ## Features
 
-- **Universal input** — drag & drop files/folders, multi-file upload, or paste a URL.
-- **Auto-detection** — input type is detected from magic bytes + MIME + extension.
-- **Dynamic outputs** — the format dropdown changes based on what you dropped.
-- **Plugin converter system** — `image`, `pdf`, `video`, `archive`, `link`.
-- **Job lifecycle** — `pending → processing → completed / failed`, with live progress.
-- **Auto-bundling** — multiple outputs are zipped into one download automatically.
-- **Safety first** — sanitized filenames, path-traversal protection, zip-bomb
+- **Universal input** - drag & drop files/folders, multi-file upload, or paste a URL.
+- **Auto-detection** - input type is detected from magic bytes + MIME + extension.
+- **Dynamic outputs** - the format dropdown changes based on what you dropped.
+- **Plugin converter system** - `image`, `pdf`, `video`, `archive`, `link`.
+- **Job lifecycle** - `pending → processing → completed / failed`, with live progress.
+- **Auto-bundling** - multiple outputs are zipped into one download automatically.
+- **Safety first** - sanitized filenames, path-traversal protection, zip-bomb
   guards, SSRF checks, rate limiting, and auto-cleanup.
-- **Rights-respecting downloads** — the link tool never bypasses DRM, paywalls,
+- **Rights-respecting downloads** - the link tool never bypasses DRM, paywalls,
   logins, or private content, and requires an explicit confirmation.
 
 ### Supported conversions (MVP)
@@ -53,17 +53,17 @@ a single orange accent, generous spacing, light/dark mode — adapted from the
 - **Next.js (App Router)** + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui** primitives (hand-rolled, in `src/components/ui`)
 - **Node.js** route handlers (no external API needed)
-- **Sharp** — image conversion/compression/resize/upscale (no system lib needed)
-- **FFmpeg** — video/audio
-- **Poppler** (`pdftoppm`, `pdftocairo`, `pdfinfo`) — PDF → image/SVG
-- **Ghostscript** — PDF compression
+- **Sharp** - image conversion/compression/resize/upscale (no system lib needed)
+- **FFmpeg** - video/audio
+- **Poppler** (`pdftoppm`, `pdftocairo`, `pdfinfo`) - PDF → image/SVG
+- **Ghostscript** - PDF compression
 - **yauzl** (safe streaming unzip) + **archiver** (zip creation)
-- **yt-dlp** — public, legal media-page downloads
+- **yt-dlp** - public, legal media-page downloads
 - **Docker** + **docker-compose**
 
 ---
 
-## Quick start (Docker — recommended)
+## Quick start (Docker - recommended)
 
 Docker is the easiest path because the image bundles every native tool.
 
@@ -90,7 +90,7 @@ npm install
 
 ### 2. Install the native tools
 
-Sharp is bundled via npm (prebuilt binaries) — no action needed. The rest are
+Sharp is bundled via npm (prebuilt binaries) - no action needed. The rest are
 system tools. Install the ones you need; missing tools simply disable their
 features (the Tools page marks them **Unavailable**, and `/api/capabilities`
 reports status).
@@ -232,7 +232,7 @@ src/
 - **Graceful shutdown**: on `SIGTERM`/`SIGINT` the queue stops accepting work and
   drains in-flight jobs within `WORKER_SHUTDOWN_GRACE_SECONDS` before exit
   (compose sets a matching `stop_grace_period`).
-- **Probes**: `GET /api/health` (liveness) and `GET /api/ready` (readiness —
+- **Probes**: `GET /api/health` (liveness) and `GET /api/ready` (readiness -
   verifies the jobs dir is writable and disk has headroom; 503 when not).
 - **Observability**: structured single-line JSON logs in production with a
   per-request `X-Request-Id` propagated to responses; queue depth on
@@ -263,7 +263,7 @@ interface Converter {
 
 - Each job is a directory: `<CONVERT_JOBS_DIR>/<jobId>/` with `input/`,
   `output/`, and `metadata.json`.
-- A per-job **token** is required to read, download, or delete a job — knowing a
+- A per-job **token** is required to read, download, or delete a job - knowing a
   job id alone is not enough.
 - The cleanup worker deletes jobs older than `JOB_TTL_MINUTES`, scanning both
   memory and disk (so leftovers from a previous process are reclaimed).
@@ -274,20 +274,20 @@ interface Converter {
 
 The trust boundary lives in `src/lib/security.ts` and `src/lib/exec.ts`:
 
-- **No shell injection** — external tools are run with `spawn(bin, args[])` and
+- **No shell injection** - external tools are run with `spawn(bin, args[])` and
   `shell: false`; user values are never interpolated into a command string.
-- **Filename sanitization** — uploads and archive entries are reduced to a safe
+- **Filename sanitization** - uploads and archive entries are reduced to a safe
   charset; directory components are stripped.
-- **Path-traversal protection** — every user-derived path goes through
+- **Path-traversal protection** - every user-derived path goes through
   `safeJoin`, which asserts the resolved path stays inside its job directory.
-- **Zip-bomb defense** — extraction meters real (not header-claimed) bytes, caps
+- **Zip-bomb defense** - extraction meters real (not header-claimed) bytes, caps
   total size + entry count, and aborts on a suspicious compression ratio. Symlink
   entries are skipped. (`src/lib/converters/archive.ts`)
-- **SSRF reduction** — the link tool only allows http/https and rejects
+- **SSRF reduction** - the link tool only allows http/https and rejects
   localhost / private / link-local / cloud-metadata hosts.
-- **Rate limiting** — a per-IP token bucket on every route.
-- **Per-job tokens** — gate download/delete/status.
-- **Auto-deletion** — temp files don’t linger.
+- **Rate limiting** - a per-IP token bucket on every route.
+- **Per-job tokens** - gate download/delete/status.
+- **Auto-deletion** - temp files don’t linger.
 
 ### Legal posture for the link downloader
 
@@ -309,7 +309,7 @@ download.
 ## Scaling out (multi-instance)
 
 The app is production-ready on a **single node**. The job store, queue, and
-rate-limiter are in-process by design — correct and efficient for one instance.
+rate-limiter are in-process by design - correct and efficient for one instance.
 To run **multiple instances behind a load balancer**, swap these for shared
 infrastructure (the interfaces are small and isolated):
 

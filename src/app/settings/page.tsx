@@ -1,7 +1,7 @@
 import { SettingsPanel } from "@/components/settings-panel";
 
 export const metadata = {
-  title: "Settings — Kanban Tools",
+  title: "Settings - Kanban Tools",
 };
 
 export default function SettingsPage() {

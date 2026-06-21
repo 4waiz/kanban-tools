@@ -12,7 +12,7 @@ import type {
 } from "../types";
 
 /**
- * Image converter — backed by Sharp (libvips). No external binary required,
+ * Image converter - backed by Sharp (libvips). No external binary required,
  * which makes it the most portable converter in the app.
  *
  * Capabilities: format conversion (PNG/JPG/WebP/AVIF), resize by width/height,
@@ -166,7 +166,7 @@ async function buildPipeline(
 ): Promise<{ ext: string; pipeline: sharp.Sharp }> {
   const img = sharp(srcPath, { failOn: "none" }).rotate();
 
-  // image:<fmt> — straight format conversion (with optional quality).
+  // image:<fmt> - straight format conversion (with optional quality).
   if (outputId.startsWith("image:") && OUTPUT_MIME[outputId.split(":")[1]]) {
     const fmt = outputId.split(":")[1];
     return { ext: fmt, pipeline: applyFormat(img, fmt, num(params.quality)) };

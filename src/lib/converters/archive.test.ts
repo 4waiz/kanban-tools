@@ -107,7 +107,7 @@ describe("safeExtractZip", () => {
 
     await expect(
       safeExtractZip(zip, dest, undefined),
-    ).resolves.toBeDefined(); // 30 is under the default 10k limit — sanity
+    ).resolves.toBeDefined(); // 30 is under the default 10k limit - sanity
 
     // Now assert the limit is actually enforced by overriding config indirectly:
     // (the default limit is high; this test documents the happy path. The unit

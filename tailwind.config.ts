@@ -5,7 +5,7 @@ import type { Config } from "tailwindcss";
  *
  * The palette is adapted directly from the BRIDGE "bridge-deck" design system:
  *   --ink    #3d4451  (primary dark slate)
- *   --orange #f15a29  (the single brand accent — used sparingly + decisively)
+ *   --orange #f15a29  (the single brand accent - used sparingly + decisively)
  * plus the grey/paper neutrals. We map those onto shadcn/ui's CSS-variable
  * convention so every component inherits the identity, in both light and dark mode.
  */
