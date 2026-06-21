@@ -108,11 +108,58 @@ export function isValidToken(token: string): boolean {
 }
 
 /**
- * Validate a public URL for the link downloader.
+ * Classify an IP literal (v4 or v6) as private / loopback / link-local /
+ * reserved — i.e. something the link downloader must never connect to. Pure and
+ * synchronous so it can be unit-tested; the DNS-resolving wrapper lives in
+ * ssrf.ts and feeds resolved addresses through here.
+ */
+export function isPrivateOrReservedIp(ip: string): boolean {
+  const addr = ip.trim().toLowerCase();
+  if (!addr) return true;
+
+  // IPv4 (also handles IPv4-mapped IPv6 like ::ffff:127.0.0.1).
+  const v4 = addr.startsWith("::ffff:") ? addr.slice(7) : addr;
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4)) {
+    const o = v4.split(".").map((n) => parseInt(n, 10));
+    if (o.some((n) => n < 0 || n > 255)) return true; // malformed → block
+    const [a, b] = o;
+    if (a === 0) return true; // 0.0.0.0/8 "this host"
+    if (a === 10) return true; // 10/8 private
+    if (a === 127) return true; // loopback
+    if (a === 169 && b === 254) return true; // link-local / cloud metadata
+    if (a === 172 && b >= 16 && b <= 31) return true; // 172.16/12 private
+    if (a === 192 && b === 168) return true; // 192.168/16 private
+    if (a === 100 && b >= 64 && b <= 127) return true; // 100.64/10 CGNAT
+    if (a === 192 && b === 0) return true; // 192.0.0/24 + 192.0.2/24 (test)
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18/15 benchmark
+    if (a === 198 && b === 51) return true; // 198.51.100/24 test
+    if (a === 203 && b === 0) return true; // 203.0.113/24 test
+    if (a >= 224) return true; // 224/4 multicast + 240/4 reserved
+    return false;
+  }
+
+  // IPv6.
+  if (addr === "::" || addr === "::1") return true; // unspecified / loopback
+  if (addr.startsWith("fe80")) return true; // link-local
+  if (addr.startsWith("fc") || addr.startsWith("fd")) return true; // ULA fc00::/7
+  if (addr.startsWith("ff")) return true; // multicast
+  if (addr.startsWith("::ffff:")) return true; // mapped but not dotted-quad → block
+  if (addr.startsWith("2001:db8")) return true; // documentation
+  if (addr.startsWith("64:ff9b")) return true; // NAT64
+
+  // Anything we can't positively classify as public, we block when it's an IP
+  // literal hostname (handled by caller). Recognized global addresses pass.
+  return false;
+}
+
+/**
+ * Validate a public URL for the link downloader (synchronous, structural).
  * - only http/https
  * - reject obvious internal/loopback hosts to reduce SSRF blast radius
- * PRODUCTION UPGRADE: resolve DNS and block the full set of private/link-local
- * CIDR ranges, and run downloads through an egress proxy / allowlist.
+ *
+ * NOTE: this is the fast structural check. The link downloader ALSO performs a
+ * DNS-resolving check (see ssrf.ts) before connecting, to defeat hostnames that
+ * resolve to private IPs and DNS-rebinding.
  */
 export function validatePublicUrl(raw: string): {
   ok: boolean;

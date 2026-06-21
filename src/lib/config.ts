@@ -22,6 +22,14 @@ function bool(name: string, fallback: boolean): boolean {
   return raw === "1" || raw.toLowerCase() === "true";
 }
 
+function cpuCount(): number {
+  try {
+    return os.cpus()?.length || 2;
+  } catch {
+    return 2;
+  }
+}
+
 const MB = 1024 * 1024;
 
 export const config = {
@@ -49,6 +57,31 @@ export const config = {
   rateLimit: {
     windowMs: int("RATE_LIMIT_WINDOW_SECONDS", 60) * 1000,
     max: int("RATE_LIMIT_MAX_REQUESTS", 40),
+  },
+
+  /** Worker pool / queue limits. */
+  worker: {
+    // Max conversions running at once. Defaults to (cores - 1), clamped to 1..8.
+    concurrency: int(
+      "WORKER_CONCURRENCY",
+      Math.max(1, Math.min(8, cpuCount() - 1)),
+    ),
+    // Max jobs allowed to wait in the queue before new work is rejected.
+    maxQueueDepth: int("WORKER_MAX_QUEUE_DEPTH", 200),
+    // Per-conversion hard timeout (ms) enforced by the runner as a backstop.
+    jobTimeoutMs: int("WORKER_JOB_TIMEOUT_SECONDS", 30 * 60) * 1000,
+    // Grace period to let in-flight jobs finish on shutdown (ms).
+    shutdownGraceMs: int("WORKER_SHUTDOWN_GRACE_SECONDS", 25) * 1000,
+  },
+
+  /** Abuse / capacity guards. */
+  limits: {
+    // Reject uploads once the jobs dir exceeds this many bytes.
+    maxTotalDiskBytes: int("MAX_TOTAL_DISK_BYTES", 10 * 1024 * MB), // 10 GB
+    // Max concurrent *active* (pending/processing) jobs per client IP.
+    maxJobsPerClient: int("MAX_JOBS_PER_CLIENT", 5),
+    // Max files in a single upload request.
+    maxFilesPerUpload: int("MAX_FILES_PER_UPLOAD", 100),
   },
 
   /** Link downloader. */

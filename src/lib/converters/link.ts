@@ -5,6 +5,7 @@ import { Readable } from "node:stream";
 import { config } from "../config";
 import { execFile, isToolAvailable } from "../exec";
 import { safeJoin, sanitizeFilename, validatePublicUrl, getExtension } from "../security";
+import { assertHostResolvesPublic } from "../ssrf";
 import { detectType } from "../detect";
 import type {
   Converter,
@@ -80,6 +81,12 @@ export const linkConverter: Converter = {
       throw new LinkError(check.reason ?? "Invalid URL.");
     }
     const url = check.url;
+
+    // SSRF: resolve the host and reject if it maps to a private/reserved IP.
+    const ssrf = await assertHostResolvesPublic(url.hostname);
+    if (!ssrf.ok) {
+      throw new LinkError(ssrf.reason ?? "That address is not allowed.");
+    }
 
     onProgress(5);
 

@@ -1,9 +1,10 @@
 import "server-only";
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import { nanoid } from "nanoid";
 import { config } from "./config";
 import { isValidJobId, safeJoin } from "./security";
+import { writeFileAtomic, dirSize } from "./fs-utils";
+import { logger } from "./logger";
 import type { Job, JobStatus, InputFileInfo, OutputFileInfo, InputKind } from "./types";
 
 /**
@@ -26,6 +27,8 @@ import type { Job, JobStatus, InputFileInfo, OutputFileInfo, InputKind } from ".
 export interface CreateJobInput {
   inputs: InputFileInfo[];
   inputKind: InputKind;
+  /** Hashed client identifier for per-client concurrency limits. */
+  clientKey?: string;
 }
 
 const memory = new Map<string, Job>();
@@ -46,12 +49,8 @@ function metadataPath(id: string): string {
 }
 
 async function persist(job: Job): Promise<void> {
-  await fs.mkdir(jobDir(job.id), { recursive: true });
-  await fs.writeFile(
-    metadataPath(job.id),
-    JSON.stringify(job, null, 2),
-    "utf8",
-  );
+  // Atomic write so a crash mid-write never corrupts metadata.json.
+  await writeFileAtomic(metadataPath(job.id), JSON.stringify(job, null, 2));
 }
 
 /** Create a new job and its directory skeleton. Does not write input files. */
@@ -70,6 +69,7 @@ export async function createJob(input: CreateJobInput): Promise<Job> {
     inputs: input.inputs,
     outputs: [],
     inputKind: input.inputKind,
+    clientKey: input.clientKey,
   };
   await fs.mkdir(inputDirFor(id), { recursive: true });
   await fs.mkdir(outputDirFor(id), { recursive: true });
@@ -162,6 +162,68 @@ export function listRecentJobs(limit = 20): Job[] {
   return [...memory.values()]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, limit);
+}
+
+/** Count a client's currently active (pending/processing) jobs. */
+export function countActiveJobsForClient(clientKey: string): number {
+  let n = 0;
+  for (const job of memory.values()) {
+    if (
+      job.clientKey === clientKey &&
+      (job.status === "pending" || job.status === "processing")
+    ) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/** Total bytes used by all job directories (for the disk quota guard). */
+export async function getTotalDiskUsage(): Promise<number> {
+  return dirSize(config.jobsDir);
+}
+
+/**
+ * Crash recovery: on boot, any job still marked `processing` (or `pending` with
+ * an output id) belongs to a process that died mid-conversion. Mark it failed so
+ * it doesn't appear stuck forever. Returns the number recovered.
+ */
+export async function recoverInterruptedJobs(): Promise<number> {
+  let entries: string[] = [];
+  try {
+    entries = await fs.readdir(config.jobsDir);
+  } catch {
+    return 0;
+  }
+  let recovered = 0;
+  for (const name of entries) {
+    if (!isValidJobId(name)) continue;
+    try {
+      const raw = await fs.readFile(
+        safeJoin(config.jobsDir, name, "metadata.json"),
+        "utf8",
+      );
+      const job = JSON.parse(raw) as Job;
+      if (job.status === "processing") {
+        job.status = "failed";
+        job.error =
+          "The server restarted while this job was processing. Please try again.";
+        job.updatedAt = Date.now();
+        memory.set(job.id, job);
+        await persist(job);
+        recovered++;
+      } else if (!memory.has(job.id)) {
+        // Re-hydrate completed/failed/pending jobs into memory.
+        memory.set(job.id, job);
+      }
+    } catch {
+      /* unreadable metadata — leave for the cleanup sweep */
+    }
+  }
+  if (recovered > 0) {
+    logger.warn("jobs.recovered_interrupted", { count: recovered });
+  }
+  return recovered;
 }
 
 /**

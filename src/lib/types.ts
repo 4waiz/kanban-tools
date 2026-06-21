@@ -117,6 +117,11 @@ export interface Job {
   error?: string;
   /** Detected input kind for the primary input. */
   inputKind: InputKind;
+  /**
+   * Opaque client identifier (hashed IP) that created the job. Used only for
+   * per-client concurrency limits and never exposed to other clients.
+   */
+  clientKey?: string;
 }
 
 /** What a converter receives to do its work. */
