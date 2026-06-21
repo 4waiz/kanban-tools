@@ -1,0 +1,163 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Kanban Tools — design tokens.
+ *
+ * Derived from the BRIDGE "bridge-deck" system:
+ *   ink/slate  #3d4451   →  used for dark surfaces + primary text on light
+ *   orange     #f15a29   →  the single brand accent (HSL ~ 13 88% 55%)
+ *   paper      #ffffff   neutrals: #eef0f2 / #e7e9ec / #d8dbe0 / #8a9099
+ *
+ * Light mode = "paper" deck slides. Dark mode = "slate" section dividers.
+ * Restraint is the brand: flat surfaces, hairline borders, orange used sparingly.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%; /* paper #ffffff */
+    --foreground: 220 14% 28%; /* ink #3d4451 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 28%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 28%;
+
+    /* Brand orange #f15a29 */
+    --primary: 13 88% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Light grey panel #eef0f2 */
+    --secondary: 220 11% 94%;
+    --secondary-foreground: 220 14% 28%;
+
+    --muted: 220 11% 94%;
+    --muted-foreground: 215 8% 57%; /* #8a9099 */
+
+    --accent: 13 88% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 11% 86%; /* hairline #d8dbe0 */
+    --input: 220 11% 86%;
+    --ring: 13 88% 55%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 220 14% 14%; /* deep slate, a touch darker than --ink for contrast */
+    --foreground: 210 16% 92%;
+
+    --card: 220 14% 18%; /* ink-ish panel */
+    --card-foreground: 210 16% 92%;
+
+    --popover: 220 14% 16%;
+    --popover-foreground: 210 16% 92%;
+
+    --primary: 13 88% 57%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 12% 22%;
+    --secondary-foreground: 210 16% 92%;
+
+    --muted: 220 12% 22%;
+    --muted-foreground: 218 11% 65%;
+
+    --accent: 13 88% 57%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 63% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 10% 28%;
+    --input: 220 10% 28%;
+    --ring: 13 88% 57%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/*
+ * BRIDGE motif helpers — small, reusable structural pieces from the deck system.
+ * These keep the "command-center" identity consistent across pages.
+ */
+@layer components {
+  /* The thin orange accent rule used under banner bars and on hot cards. */
+  .brand-rule {
+    @apply h-[3px] w-full bg-primary;
+  }
+
+  /* Left edge tab marking the single most important item (orange 6px bar). */
+  .edge-tab {
+    @apply relative overflow-hidden;
+  }
+  .edge-tab::before {
+    content: "";
+    @apply absolute left-0 top-0 bottom-0 w-[5px] bg-primary;
+  }
+
+  /* Status pills — flat, chip-like, matching the deck "chip" motif. */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold tracking-wide;
+  }
+
+  /* Subtle grid backdrop for the command-center hero feel (very low contrast). */
+  .grid-backdrop {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(
+      ellipse 60% 50% at 50% 0%,
+      #000 30%,
+      transparent 75%
+    );
+    mask-image: radial-gradient(
+      ellipse 60% 50% at 50% 0%,
+      #000 30%,
+      transparent 75%
+    );
+  }
+
+  /* Loading shimmer for skeletons. */
+  .shimmer {
+    @apply relative overflow-hidden;
+  }
+  .shimmer::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--foreground) / 0.06),
+      transparent
+    );
+    @apply animate-shimmer;
+  }
+}
+
+/* Thin, unobtrusive scrollbars to keep the minimal feel. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 8px;
+}
