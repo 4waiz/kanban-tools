@@ -30,8 +30,11 @@ services:
       # Ephemeral storage on the free tier (no mounted disk).
       - key: CONVERT_JOBS_DIR
         value: /tmp/convert-jobs
+      # Kept under Cloudflare's 100 MB free-plan proxy upload cap so uploads
+      # don't fail once the domain is proxied (orange cloud). Raise this if you
+      # serve the app on "DNS only" or upgrade Cloudflare.
       - key: MAX_FILE_SIZE_MB
-        value: "512"
+        value: "95"
       - key: JOB_TTL_MINUTES
         value: "30"
       - key: CLEANUP_INTERVAL_MINUTES
