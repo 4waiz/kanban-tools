@@ -1,5 +1,5 @@
 import { promises as fs, createReadStream } from "node:fs";
-import { guard, errorJson } from "@/lib/api";
+import { guard, errorJson, withRequestId } from "@/lib/api";
 import { getAuthorizedJob, outputDirFor } from "@/lib/jobs";
 import { resolveDownloadName } from "@/lib/runner";
 import { isValidJobId, safeJoin, sanitizeFilename } from "@/lib/security";
@@ -21,20 +21,29 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
+  const { ctx } = g;
 
   const { id } = await params;
-  if (!isValidJobId(id)) return errorJson("Invalid job id.", 400);
+  if (!isValidJobId(id))
+    return withRequestId(errorJson("Invalid job id.", 400), ctx.requestId);
 
   const url = new URL(req.url);
   const token = url.searchParams.get("token");
   const requestedFile = url.searchParams.get("file");
 
   const job = await getAuthorizedJob(id, token);
-  if (!job) return errorJson("Job not found or not authorized.", 404);
+  if (!job)
+    return withRequestId(
+      errorJson("Job not found or not authorized.", 404),
+      ctx.requestId,
+    );
   if (job.status !== "completed") {
-    return errorJson("This job has no downloadable result yet.", 409);
+    return withRequestId(
+      errorJson("This job has no downloadable result yet.", 409),
+      ctx.requestId,
+    );
   }
 
   // Determine which file to serve.
@@ -75,6 +84,8 @@ export async function GET(
   const nodeStream = createReadStream(filePath);
   const webStream = Readable.toWeb(nodeStream) as unknown as WebReadableStream<Uint8Array>;
 
+  ctx.log.info("job.download", { jobId: id, file: name, bytes: stat.size });
+
   return new Response(webStream as unknown as BodyInit, {
     status: 200,
     headers: {
@@ -82,6 +93,7 @@ export async function GET(
       "Content-Length": String(stat.size),
       "Content-Disposition": `attachment; filename="${encodeURIComponent(name)}"`,
       "Cache-Control": "no-store",
+      "X-Request-Id": ctx.requestId,
     },
   });
 }

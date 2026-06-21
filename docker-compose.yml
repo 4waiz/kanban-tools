@@ -32,11 +32,13 @@ services:
     # Conversions can be memory-hungry; raise if you process large media.
     # mem_limit: 2g
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/capabilities').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
+    # Give in-flight conversions time to finish on stop (matches the app's grace).
+    stop_grace_period: 30s
 
 volumes:
   jobs-data:

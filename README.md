@@ -12,9 +12,13 @@ The UI follows a precise, futuristic “command-center” aesthetic — flat sla
 a single orange accent, generous spacing, light/dark mode — adapted from the
 *bridge-deck* design system.
 
-> ⚠️ This is a working MVP designed to be extended. It stores jobs in memory and
-> files on local disk. See **Production upgrades** for the path to a hardened,
-> multi-instance deployment.
+> **Production-ready, single-node.** Conversions run through a **bounded worker
+> pool** (no resource exhaustion under load), job state is **crash-recoverable**
+> on disk with **atomic writes**, the process does a **graceful shutdown** so a
+> deploy doesn’t kill in-flight jobs, and there are **liveness/readiness**
+> probes, **structured JSON logs**, **security headers**, **disk + concurrency
+> quotas**, and **DNS-resolving SSRF protection**. Scaling to multiple instances
+> additionally needs a shared store/queue (Redis/BullMQ) — see **Scaling out**.
 
 ---
 
@@ -177,6 +181,7 @@ commented list). Highlights:
 
 ```
 src/
+  instrumentation.ts         Runs once at server boot → lifecycle.startup()
   app/
     page.tsx                 Home: hero + central converter card + recent jobs
     tools/page.tsx           Tools catalog (opens the converter with a preset)
@@ -184,27 +189,57 @@ src/
     settings/page.tsx        Preferences + environment capabilities
     api/
       detect/route.ts        Detect input type + available outputs
-      upload/route.ts        Multipart upload → creates a job
-      convert/route.ts       Start a conversion (fire-and-forget runner)
+      upload/route.ts        Multipart upload → creates a job (atomic writes)
+      convert/route.ts       Enqueue a conversion on the worker pool
       link/route.ts          Start a link download (requires rights confirmation)
       jobs/[id]/route.ts     GET status · DELETE files (token-gated)
       jobs/[id]/download/    Stream the result (token-gated, safe path)
-      capabilities/route.ts  Which native tools are installed
+      capabilities/route.ts  Which native tools are installed + queue stats
+      health/route.ts        Liveness probe
+      ready/route.ts         Readiness probe (disk writable + headroom)
   components/                UI (shadcn primitives + app components)
   lib/
-    config.ts                Env-driven configuration
+    config.ts                Env-driven configuration (incl. worker/limits)
     types.ts                 Shared domain types + the Converter contract
     detect.ts                Magic-byte + MIME + extension detection
-    security.ts              Filename sanitize, safeJoin, URL validation
+    security.ts              Filename sanitize, safeJoin, URL + IP validation
+    ssrf.ts                  DNS-resolving SSRF guard for the link downloader
     exec.ts                  spawn(arg[]) wrapper with timeouts (no shell)
-    jobs.ts                  Job store (in-memory + metadata.json)
-    runner.ts                Executes a converter, bundles multi-output
-    cleanup.ts               Background TTL cleanup worker
-    rate-limit.ts            In-memory token bucket
+    fs-utils.ts              Atomic writes (temp+rename), dir size, disk guard
+    jobs.ts                  Job store (disk-backed, atomic, crash-recoverable)
+    queue.ts                 Bounded work queue + fixed-size worker pool
+    runner.ts                Executes a converter via the queue; bundles outputs
+    lifecycle.ts             Startup (recovery + cleanup) + graceful shutdown
+    cleanup.ts               Thin shim → lifecycle.startup()
+    rate-limit.ts            In-memory token bucket + hashed client key
+    logger.ts                Structured JSON logger (dev-friendly in dev)
+    api.ts                   Route guard: rate limit, capacity, request id, log
     converters/
       registry.ts            Wires converters together
       image.ts  pdf.ts  video.ts  archive.ts  link.ts
 ```
+
+### Reliability & operations
+
+- **Bounded worker pool** (`queue.ts` + `runner.ts`): at most `WORKER_CONCURRENCY`
+  conversions run at once, with a bounded backlog. A burst of uploads can’t spawn
+  unbounded FFmpeg/Sharp processes; excess work queues, and a full backlog returns
+  HTTP 503 (fail fast) rather than melting the box.
+- **Crash recovery**: on boot, jobs left in `processing` by a killed process are
+  marked `failed` (not stuck forever). Job state lives in `metadata.json`.
+- **Atomic writes**: metadata and uploaded files are written to a temp file then
+  renamed, so a crash mid-write never leaves a corrupt/empty file.
+- **Graceful shutdown**: on `SIGTERM`/`SIGINT` the queue stops accepting work and
+  drains in-flight jobs within `WORKER_SHUTDOWN_GRACE_SECONDS` before exit
+  (compose sets a matching `stop_grace_period`).
+- **Probes**: `GET /api/health` (liveness) and `GET /api/ready` (readiness —
+  verifies the jobs dir is writable and disk has headroom; 503 when not).
+- **Observability**: structured single-line JSON logs in production with a
+  per-request `X-Request-Id` propagated to responses; queue depth on
+  `/api/capabilities` and `/api/ready`.
+- **Capacity guards**: global disk quota (`MAX_TOTAL_DISK_BYTES`), per-client
+  concurrent-job cap (`MAX_JOBS_PER_CLIENT`), per-request rate limit, and upload
+  size/count caps.
 
 ### The converter plugin contract
 
@@ -271,20 +306,31 @@ download.
 
 ---
 
-## Production upgrades
+## Scaling out (multi-instance)
 
-This MVP is structured so these are mechanical swaps (each is flagged with a
-`PRODUCTION UPGRADE` comment in the code):
+The app is production-ready on a **single node**. The job store, queue, and
+rate-limiter are in-process by design — correct and efficient for one instance.
+To run **multiple instances behind a load balancer**, swap these for shared
+infrastructure (the interfaces are small and isolated):
 
-- **Job store** → Redis/Postgres instead of the in-memory `Map`.
-- **File storage** → S3/R2/GCS with presigned uploads/downloads (a
-  `STORAGE_PROVIDER` placeholder exists in `.env.example` and Settings).
-- **Job execution** → a real queue (BullMQ/SQS) + worker pool instead of the
-  in-process fire-and-forget runner.
-- **Cleanup** → a dedicated worker or object-store lifecycle rules.
-- **Rate limiting** → Redis-backed, keyed by authenticated user.
-- **Auth** → tie per-job tokens to user sessions.
-- **SSRF** → full DNS resolution + CIDR blocking + egress proxy.
+- **Job store** → Redis/Postgres instead of the in-memory index in `jobs.ts`
+  (the disk-backed `metadata.json` already provides durability for one node).
+- **Queue** → BullMQ/SQS + a dedicated worker process instead of the in-process
+  `WorkQueue`, so jobs survive a web-tier restart and spread across workers.
+- **File storage** → S3/R2/GCS with presigned upload/download URLs so the web
+  tier never proxies large files (a `STORAGE_PROVIDER` placeholder exists in
+  `.env.example` and Settings). On a single node, local disk + TTL cleanup is
+  the right, simple choice.
+- **Rate limiting** → Redis-backed (INCR + EXPIRE), keyed by user where you add
+  auth.
+
+Each of the above is a contained change; the converter contract, routes, and UI
+stay the same. The remaining hardening note is infra-level, not code:
+
+- **SSRF (defense in depth)**: the link downloader already resolves DNS and
+  blocks private/reserved IPs (v4+v6). For a hostile multi-tenant deployment,
+  additionally route egress through an allowlisting proxy and/or pin connections
+  to the validated IP to fully close the TOCTOU/DNS-rebind window.
 
 ---
 

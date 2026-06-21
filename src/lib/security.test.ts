@@ -8,6 +8,7 @@ import {
   isValidJobId,
   isValidToken,
   validatePublicUrl,
+  isPrivateOrReservedIp,
   PathTraversalError,
 } from "./security";
 
@@ -111,5 +112,55 @@ describe("validatePublicUrl", () => {
   it("rejects garbage", () => {
     expect(validatePublicUrl("not a url").ok).toBe(false);
     expect(validatePublicUrl("").ok).toBe(false);
+  });
+});
+
+describe("isPrivateOrReservedIp", () => {
+  it("flags IPv4 private / loopback / link-local / CGNAT ranges", () => {
+    for (const ip of [
+      "0.0.0.0",
+      "10.0.0.1",
+      "10.255.255.255",
+      "127.0.0.1",
+      "169.254.169.254", // cloud metadata
+      "172.16.0.1",
+      "172.31.255.255",
+      "192.168.0.1",
+      "100.64.0.1", // CGNAT
+      "224.0.0.1", // multicast
+      "255.255.255.255",
+    ]) {
+      expect(isPrivateOrReservedIp(ip), ip).toBe(true);
+    }
+  });
+
+  it("allows public IPv4 addresses", () => {
+    for (const ip of ["8.8.8.8", "1.1.1.1", "93.184.216.34", "172.15.0.1", "172.32.0.1"]) {
+      expect(isPrivateOrReservedIp(ip), ip).toBe(false);
+    }
+  });
+
+  it("flags IPv6 loopback / link-local / ULA / mapped", () => {
+    for (const ip of [
+      "::1",
+      "::",
+      "fe80::1",
+      "fc00::1",
+      "fd12:3456::1",
+      "ff02::1",
+      "::ffff:127.0.0.1", // mapped loopback
+      "2001:db8::1", // documentation
+    ]) {
+      expect(isPrivateOrReservedIp(ip), ip).toBe(true);
+    }
+  });
+
+  it("allows public IPv6 addresses", () => {
+    expect(isPrivateOrReservedIp("2606:4700:4700::1111")).toBe(false); // Cloudflare
+  });
+
+  it("treats malformed input as unsafe", () => {
+    expect(isPrivateOrReservedIp("")).toBe(true);
+    expect(isPrivateOrReservedIp("999.999.999.999")).toBe(true);
   });
 });

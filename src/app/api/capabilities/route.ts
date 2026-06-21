@@ -1,6 +1,7 @@
 import { guard, json } from "@/lib/api";
 import { config } from "@/lib/config";
 import { isToolAvailable } from "@/lib/exec";
+import { queueStats } from "@/lib/runner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +16,11 @@ const TTL = 60_000;
  * annotate features that aren't available in the current environment.
  */
 export async function GET(req: Request) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
 
   if (cache && Date.now() - cache.at < TTL) {
-    return json({ tools: cache.data, limits: limitInfo() });
+    return json({ tools: cache.data, limits: limitInfo(), queue: queueStats() });
   }
 
   const [ffmpeg, ffprobe, pdftoppm, pdftocairo, ghostscript, ytdlp] =
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
     linkDownloader: config.link.enabled,
   };
   cache = { at: Date.now(), data };
-  return json({ tools: data, limits: limitInfo() });
+  return json({ tools: data, limits: limitInfo(), queue: queueStats() });
 }
 
 function limitInfo() {

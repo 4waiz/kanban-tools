@@ -13,8 +13,8 @@ export const runtime = "nodejs";
  * can populate the format dropdown before any upload happens.
  */
 export async function POST(req: Request) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
 
   let body: {
     files?: { name: string; type?: string; size?: number }[];

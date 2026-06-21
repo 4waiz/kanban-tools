@@ -1,7 +1,7 @@
-import { guard, json, errorJson } from "@/lib/api";
+import { guard, json, errorJson, withRequestId } from "@/lib/api";
 import { getAuthorizedJob, updateJob, publicJob } from "@/lib/jobs";
 import { converterForOutput } from "@/lib/converters/registry";
-import { runJob } from "@/lib/runner";
+import { enqueueJob, QueueFullError } from "@/lib/runner";
 import { isValidJobId } from "@/lib/security";
 
 export const runtime = "nodejs";
@@ -10,12 +10,13 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/convert
  * Body: { jobId, token, outputId, params? }
- * Authorizes the job, records the chosen operation + params, and kicks off the
- * conversion in the background. The client then polls /api/jobs/:id.
+ * Authorizes the job, records the chosen operation + params, and enqueues the
+ * conversion on the bounded worker pool. The client then polls /api/jobs/:id.
  */
 export async function POST(req: Request) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
+  const { ctx } = g;
 
   let body: {
     jobId?: string;
@@ -26,23 +27,35 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return errorJson("Invalid JSON body.");
+    return withRequestId(errorJson("Invalid JSON body."), ctx.requestId);
   }
 
   const { jobId, token, outputId, params } = body;
-  if (!jobId || !isValidJobId(jobId)) return errorJson("Invalid job id.");
-  if (!outputId) return errorJson("No output format selected.");
+  if (!jobId || !isValidJobId(jobId))
+    return withRequestId(errorJson("Invalid job id."), ctx.requestId);
+  if (!outputId)
+    return withRequestId(errorJson("No output format selected."), ctx.requestId);
 
   const job = await getAuthorizedJob(jobId, token);
-  if (!job) return errorJson("Job not found or not authorized.", 404);
+  if (!job)
+    return withRequestId(
+      errorJson("Job not found or not authorized.", 404),
+      ctx.requestId,
+    );
 
   if (job.status === "processing") {
-    return errorJson("This job is already processing.", 409);
+    return withRequestId(
+      errorJson("This job is already processing.", 409),
+      ctx.requestId,
+    );
   }
 
   const converter = converterForOutput(outputId);
   if (!converter) {
-    return errorJson(`Unsupported output format: ${outputId}`);
+    return withRequestId(
+      errorJson(`Unsupported output format: ${outputId}`),
+      ctx.requestId,
+    );
   }
 
   // Merge sanitized params (numbers/strings/booleans only).
@@ -71,10 +84,24 @@ export async function POST(req: Request) {
     bundleName: undefined,
   });
 
-  // Fire-and-forget. Errors are captured inside runJob and reflected in status.
-  // PRODUCTION UPGRADE: enqueue instead of running in the request process.
-  void runJob(jobId);
+  // Enqueue on the bounded pool. If the backlog is full, fail fast with 503.
+  try {
+    void enqueueJob(jobId).catch(() => {
+      /* terminal errors are recorded on the job by the runner */
+    });
+  } catch (err) {
+    if (err instanceof QueueFullError) {
+      await updateJob(jobId, { status: "failed", error: err.message });
+      return withRequestId(errorJson(err.message, 503), ctx.requestId);
+    }
+    throw err;
+  }
+
+  ctx.log.info("convert.enqueued", { jobId, outputId });
 
   const updated = await getAuthorizedJob(jobId, token);
-  return json({ job: updated ? publicJob(updated) : null });
+  return withRequestId(
+    json({ job: updated ? publicJob(updated) : null }),
+    ctx.requestId,
+  );
 }

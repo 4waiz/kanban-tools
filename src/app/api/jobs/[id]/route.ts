@@ -1,4 +1,4 @@
-import { guard, json, errorJson } from "@/lib/api";
+import { guard, json, errorJson, withRequestId } from "@/lib/api";
 import { getAuthorizedJob, deleteJob, publicJob } from "@/lib/jobs";
 import { isValidJobId } from "@/lib/security";
 
@@ -14,17 +14,23 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
+  const { ctx } = g;
 
   const { id } = await params;
-  if (!isValidJobId(id)) return errorJson("Invalid job id.", 400);
+  if (!isValidJobId(id))
+    return withRequestId(errorJson("Invalid job id.", 400), ctx.requestId);
 
   const token = new URL(req.url).searchParams.get("token");
   const job = await getAuthorizedJob(id, token);
-  if (!job) return errorJson("Job not found or not authorized.", 404);
+  if (!job)
+    return withRequestId(
+      errorJson("Job not found or not authorized.", 404),
+      ctx.requestId,
+    );
 
-  return json({ job: publicJob(job) });
+  return withRequestId(json({ job: publicJob(job) }), ctx.requestId);
 }
 
 /**
@@ -35,16 +41,23 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const limited = guard(req);
-  if (limited) return limited;
+  const g = guard(req);
+  if ("response" in g) return g.response;
+  const { ctx } = g;
 
   const { id } = await params;
-  if (!isValidJobId(id)) return errorJson("Invalid job id.", 400);
+  if (!isValidJobId(id))
+    return withRequestId(errorJson("Invalid job id.", 400), ctx.requestId);
 
   const token = new URL(req.url).searchParams.get("token");
   const job = await getAuthorizedJob(id, token);
-  if (!job) return errorJson("Job not found or not authorized.", 404);
+  if (!job)
+    return withRequestId(
+      errorJson("Job not found or not authorized.", 404),
+      ctx.requestId,
+    );
 
   const ok = await deleteJob(id);
-  return json({ ok });
+  ctx.log.info("job.deleted", { jobId: id, ok });
+  return withRequestId(json({ ok }), ctx.requestId);
 }
