@@ -1,0 +1,47 @@
+# Render Blueprint for Kanban Tools.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This deploys the existing Dockerfile as a web service with a persistent disk
+# for job files. Render injects PORT (default 10000); the app already binds it
+# via the PORT/HOSTNAME env vars baked into the Dockerfile/next standalone server.
+#
+# To use: push this repo to GitHub, then in Render → "New +" → "Blueprint" and
+# point it at the repo. Render reads this file and provisions everything.
+
+services:
+  - type: web
+    name: kanban-tools
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter # 512MB/0.5CPU is the floor for media work; bump to standard for big files
+    healthCheckPath: /api/health
+    autoDeploy: true
+    # Render sets PORT; the app reads it. HOSTNAME 0.0.0.0 is already in the image.
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Point job storage at the mounted persistent disk.
+      - key: CONVERT_JOBS_DIR
+        value: /data/convert-jobs
+      - key: MAX_FILE_SIZE_MB
+        value: "512"
+      - key: JOB_TTL_MINUTES
+        value: "30"
+      - key: CLEANUP_INTERVAL_MINUTES
+        value: "5"
+      - key: ENABLE_LINK_DOWNLOADER
+        value: "true"
+      - key: YTDLP_PATH
+        value: yt-dlp
+      - key: LOG_LEVEL
+        value: info
+      # Keep concurrency modest on small instances to avoid OOM.
+      - key: WORKER_CONCURRENCY
+        value: "2"
+      # Disk quota guard a bit under the mounted disk size (see disk: below).
+      - key: MAX_TOTAL_DISK_BYTES
+        value: "8589934592" # 8 GB (disk is 10 GB)
+    disk:
+      name: jobs-data
+      mountPath: /data
+      sizeGB: 10
