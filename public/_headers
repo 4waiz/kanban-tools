@@ -1,0 +1,19 @@
+# Cloudflare Pages headers (https://developers.cloudflare.com/pages/configuration/headers/)
+#
+# ffmpeg.wasm needs SharedArrayBuffer, which browsers only enable when the page
+# is "cross-origin isolated". That requires these two headers on every document.
+# We also ship a baseline set of security headers (CSP is relaxed enough for the
+# WASM workers + blob URLs this app creates).
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self' data: blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'
+
+# WASM assets must be served cross-origin-isolation-compatible too.
+/*.wasm
+  Content-Type: application/wasm
+  Cross-Origin-Resource-Policy: cross-origin

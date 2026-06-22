@@ -1,22 +1,18 @@
-import "server-only";
-import { promises as fs } from "node:fs";
-import sharp from "sharp";
-import { safeJoin } from "../security";
 import type {
   Converter,
   ConvertContext,
   ConvertResult,
   DetectInput,
   OutputOption,
-  OutputFileInfo,
+  OutputArtifact,
+  ParamValue,
 } from "../types";
 
 /**
- * Image converter - backed by Sharp (libvips). No external binary required,
- * which makes it the most portable converter in the app.
- *
- * Capabilities: format conversion (PNG/JPG/WebP/AVIF), resize by width/height,
- * compress by quality, and a high-quality "2x upscale" (Lanczos resize).
+ * Browser image converter — uses the Canvas 2D API and `createImageBitmap`.
+ * Runs entirely in the tab; no WASM, no server. Covers format conversion
+ * (PNG/JPG/WebP, AVIF where the browser can encode it), resize, compress, and
+ * high-quality upscaling.
  */
 
 const OUTPUT_MIME: Record<string, string> = {
@@ -48,13 +44,12 @@ export const imageConverter: Converter = {
 
   getAvailableOutputs(input: DetectInput): OutputOption[] {
     if (input.kind !== "image") return [];
-    const formats: { id: string; label: string }[] = [
+    const formats = [
       { id: "png", label: "PNG" },
       { id: "jpg", label: "JPG" },
       { id: "webp", label: "WebP" },
       { id: "avif", label: "AVIF" },
     ];
-
     const opts: OutputOption[] = formats.map((f) => ({
       id: `image:${f.id}`,
       label: f.label,
@@ -81,7 +76,6 @@ export const imageConverter: Converter = {
             { value: "png", label: "PNG" },
             { value: "jpg", label: "JPG" },
             { value: "webp", label: "WebP" },
-            { value: "avif", label: "AVIF" },
           ],
         },
       ],
@@ -97,8 +91,8 @@ export const imageConverter: Converter = {
 
     opts.push({
       id: "image:upscale",
-      label: "Upscale 2×",
-      description: "Double the resolution with high-quality resampling",
+      label: "Upscale",
+      description: "Enlarge 2-4x with smooth resampling",
       converter: "image",
       params: [
         {
@@ -107,9 +101,9 @@ export const imageConverter: Converter = {
           type: "select",
           default: "2",
           options: [
-            { value: "2", label: "2×" },
-            { value: "3", label: "3×" },
-            { value: "4", label: "4×" },
+            { value: "2", label: "2x" },
+            { value: "3", label: "3x" },
+            { value: "4", label: "4x" },
           ],
         },
       ],
@@ -119,132 +113,137 @@ export const imageConverter: Converter = {
   },
 
   async convert(ctx: ConvertContext): Promise<ConvertResult> {
-    const { job, inputDir, outputDir, onProgress } = ctx;
-    const outputId = job.outputId ?? "";
-    const outputs: OutputFileInfo[] = [];
-
-    // Each uploaded image is processed independently; results may be zipped
-    // later by the job runner if there's more than one.
-    const total = job.inputs.length || 1;
+    const { files, outputId, params, onProgress } = ctx;
+    const outputs: OutputArtifact[] = [];
+    const total = files.length || 1;
     let done = 0;
 
-    for (const input of job.inputs) {
-      const srcPath = safeJoin(inputDir, input.storedName);
-      const stem = input.storedName.replace(/\.[^.]+$/, "");
-
-      // Decide target format + pipeline based on the chosen operation.
-      const { ext, pipeline } = await buildPipeline(outputId, srcPath, job.params, input.ext);
-
-      const outName = `${stem}.${ext}`;
-      const outPath = safeJoin(outputDir, outName);
-      await pipeline.toFile(outPath);
-
-      const stat = await fs.stat(outPath);
-      outputs.push({
-        name: outName,
-        size: stat.size,
-        mime: OUTPUT_MIME[ext] ?? `image/${ext}`,
-      });
-
+    for (const file of files) {
+      const artifact = await convertOne(file, outputId, params);
+      outputs.push(artifact);
       done++;
       onProgress(Math.round((done / total) * 100));
     }
-
     return { outputs };
   },
 };
 
-/**
- * Build a Sharp pipeline + the resolved output extension for an operation.
- * `.rotate()` (with no args) auto-orients using EXIF before any resize.
- */
-async function buildPipeline(
+async function convertOne(
+  file: File,
   outputId: string,
-  srcPath: string,
-  params: Record<string, string | number | boolean>,
-  srcExt: string,
-): Promise<{ ext: string; pipeline: sharp.Sharp }> {
-  const img = sharp(srcPath, { failOn: "none" }).rotate();
+  params: Record<string, ParamValue>,
+): Promise<OutputArtifact> {
+  const bitmap = await createImageBitmap(file);
+  const stem = file.name.replace(/\.[^.]+$/, "") || "image";
+  const srcExt = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] || "").toLowerCase();
 
-  // image:<fmt> - straight format conversion (with optional quality).
-  if (outputId.startsWith("image:") && OUTPUT_MIME[outputId.split(":")[1]]) {
-    const fmt = outputId.split(":")[1];
-    return { ext: fmt, pipeline: applyFormat(img, fmt, num(params.quality)) };
-  }
+  let targetW = bitmap.width;
+  let targetH = bitmap.height;
+  let fmt = "png";
+  let quality = 0.8;
 
-  if (outputId === "image:compress") {
-    // Compress: keep the source format where it makes sense, drop to JPEG/WebP
-    // quality. PNG is re-encoded with max compression effort.
-    const fmt = normalizeKeepFormat(srcExt);
-    return { ext: fmt, pipeline: applyFormat(img, fmt, num(params.quality, 70)) };
-  }
-
-  if (outputId === "image:resize") {
-    const width = optNum(params.width);
-    const height = optNum(params.height);
-    const resized = img.resize({
-      width,
-      height,
-      fit: "inside",
-      withoutEnlargement: false,
-    });
-    const fmtSel = str(params.format, "keep");
-    const fmt = fmtSel === "keep" ? normalizeKeepFormat(srcExt) : fmtSel;
-    return { ext: fmt, pipeline: applyFormat(resized, fmt, num(params.quality, 82)) };
-  }
-
-  if (outputId === "image:upscale") {
+  if (OUTPUT_MIME[outputId.split(":")[1]] && outputId.startsWith("image:")) {
+    fmt = outputId.split(":")[1];
+    quality = num(params.quality, fmt === "avif" ? 55 : 80) / 100;
+  } else if (outputId === "image:compress") {
+    fmt = keepFormat(srcExt);
+    quality = num(params.quality, 70) / 100;
+  } else if (outputId === "image:resize") {
+    const w = optNum(params.width);
+    const h = optNum(params.height);
+    const scaled = fitInside(bitmap.width, bitmap.height, w, h);
+    targetW = scaled.w;
+    targetH = scaled.h;
+    const sel = str(params.format, "keep");
+    fmt = sel === "keep" ? keepFormat(srcExt) : sel;
+    quality = 0.82;
+  } else if (outputId === "image:upscale") {
     const factor = Math.max(2, Math.min(4, parseInt(str(params.factor, "2"), 10) || 2));
-    const meta = await img.metadata();
-    const targetW = meta.width ? Math.round(meta.width * factor) : undefined;
-    const upscaled = img.resize({
-      width: targetW,
-      kernel: "lanczos3",
-      withoutEnlargement: false,
-    });
-    const fmt = normalizeKeepFormat(srcExt);
-    return { ext: fmt, pipeline: applyFormat(upscaled, fmt, 90) };
+    targetW = Math.round(bitmap.width * factor);
+    targetH = Math.round(bitmap.height * factor);
+    fmt = keepFormat(srcExt);
+    quality = 0.9;
   }
 
-  // Fallback: re-encode to PNG.
-  return { ext: "png", pipeline: applyFormat(img, "png") };
-}
+  const mime = OUTPUT_MIME[fmt] ?? "image/png";
+  let blob = await drawToBlob(bitmap, targetW, targetH, mime, quality);
+  bitmap.close?.();
 
-function applyFormat(img: sharp.Sharp, fmt: string, quality = 80): sharp.Sharp {
-  switch (fmt) {
-    case "jpg":
-    case "jpeg":
-      return img.jpeg({ quality, mozjpeg: true });
-    case "webp":
-      return img.webp({ quality });
-    case "avif":
-      return img.avif({ quality });
-    case "png":
-    default:
-      return img.png({ compressionLevel: 9, effort: 7 });
+  // Some browsers can't ENCODE avif/webp; canvas silently falls back to png.
+  // Detect that and correct the extension so the file isn't mislabeled.
+  let realFmt = fmt;
+  if ((fmt === "avif" || fmt === "webp") && blob.type !== mime) {
+    realFmt = blob.type === "image/webp" ? "webp" : "png";
   }
+  if (!blob || blob.size === 0) {
+    // Last-resort fallback to PNG.
+    blob = await drawToBlob(await createImageBitmap(file), targetW, targetH, "image/png", 1);
+    realFmt = "png";
+  }
+
+  const name = `${stem}.${realFmt}`;
+  return { name, blob, mime: blob.type || mime, size: blob.size };
 }
 
-/** Map an arbitrary source extension to a format Sharp can write. */
-function normalizeKeepFormat(ext: string): string {
-  const e = (ext || "").toLowerCase();
-  if (e === "jpeg" || e === "jpg") return "jpg";
+function drawToBlob(
+  bitmap: ImageBitmap,
+  w: number,
+  h: number,
+  mime: string,
+  quality: number,
+): Promise<Blob> {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, w);
+  canvas.height = Math.max(1, h);
+  const cx = canvas.getContext("2d");
+  if (!cx) throw new Error("Canvas is not available in this browser.");
+  cx.imageSmoothingEnabled = true;
+  cx.imageSmoothingQuality = "high";
+  cx.drawImage(bitmap, 0, 0, w, h);
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => {
+        if (b) resolve(b);
+        else reject(new Error("Failed to encode the image."));
+      },
+      mime,
+      mime === "image/png" ? undefined : quality,
+    );
+  });
+}
+
+function fitInside(
+  srcW: number,
+  srcH: number,
+  maxW?: number,
+  maxH?: number,
+): { w: number; h: number } {
+  if (!maxW && !maxH) return { w: srcW, h: srcH };
+  if (maxW && !maxH) return { w: maxW, h: Math.round((maxW / srcW) * srcH) };
+  if (!maxW && maxH) return { w: Math.round((maxH / srcH) * srcW), h: maxH };
+  // Both: scale to fit the box, preserving aspect.
+  const ratio = Math.min(maxW! / srcW, maxH! / srcH);
+  return { w: Math.round(srcW * ratio), h: Math.round(srcH * ratio) };
+}
+
+function keepFormat(ext: string): string {
+  const e = ext.toLowerCase();
+  if (e === "jpg" || e === "jpeg") return "jpg";
   if (e === "webp") return "webp";
-  if (e === "avif") return "avif";
   if (e === "png") return "png";
-  // Unsupported-to-write source (gif/tiff/bmp/heic) → safe, lossless PNG.
+  // gif/bmp/tiff/heic source → safe PNG output.
   return "png";
 }
 
-function num(v: unknown, fallback = 80): number {
+function num(v: ParamValue | undefined, fallback: number): number {
   const n = typeof v === "number" ? v : parseInt(String(v ?? ""), 10);
   return Number.isFinite(n) ? Math.max(1, Math.min(100, n)) : fallback;
 }
-function optNum(v: unknown): number | undefined {
+function optNum(v: ParamValue | undefined): number | undefined {
   if (v === undefined || v === null || v === "") return undefined;
   const n = typeof v === "number" ? v : parseInt(String(v), 10);
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
-function str(v: unknown, fallback: string): string {
+function str(v: ParamValue | undefined, fallback: string): string {
   return v === undefined || v === null || v === "" ? fallback : String(v);
 }

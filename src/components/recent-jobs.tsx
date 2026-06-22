@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
   Clock,
   Trash2,
@@ -22,7 +21,6 @@ import {
   clearRecentJobs,
   type RecentJob,
 } from "@/lib/local-store";
-import { deleteJobRequest } from "@/lib/client";
 import type { InputKind } from "@/lib/types";
 
 const KIND_ICON: Record<InputKind, React.ElementType> = {
@@ -53,17 +51,6 @@ export function RecentJobs() {
     };
   }, [refresh]);
 
-  async function handleDelete(job: RecentJob) {
-    // Try to delete server-side files too; ignore failures (may already be gone).
-    try {
-      await deleteJobRequest(job.id, job.token);
-    } catch {
-      /* ignore */
-    }
-    removeRecentJob(job.id);
-    refresh();
-  }
-
   if (!mounted) return null;
 
   if (jobs.length === 0) {
@@ -72,10 +59,10 @@ export function RecentJobs() {
         <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-muted-foreground">
           <Clock className="h-5 w-5" />
         </div>
-        <p className="text-sm font-medium">No recent jobs yet</p>
+        <p className="text-sm font-medium">No recent conversions yet</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your conversions will show up here. They’re stored locally in your
-          browser.
+          Your conversions appear here. They’re stored locally in your browser;
+          result files aren’t kept after you leave.
         </p>
       </div>
     );
@@ -84,9 +71,7 @@ export function RecentJobs() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-muted-foreground">
-          Recent jobs
-        </h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">Recent conversions</h2>
         <Button
           variant="ghost"
           size="sm"
@@ -104,26 +89,26 @@ export function RecentJobs() {
           return (
             <li
               key={job.id}
-              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/40"
+              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
                 <Icon className="h-4 w-4" />
               </div>
-              <Link
-                href={`/jobs/${job.id}?token=${encodeURIComponent(job.token)}`}
-                className="min-w-0 flex-1"
-              >
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{job.label}</p>
                 <p className="text-xs text-muted-foreground">
                   {job.outputLabel ? `${job.outputLabel} · ` : ""}
                   {timeAgo(job.createdAt)}
                 </p>
-              </Link>
+              </div>
               <StatusPill status={job.status} className="hidden sm:inline-flex" />
               <button
-                onClick={() => handleDelete(job)}
+                onClick={() => {
+                  removeRecentJob(job.id);
+                  refresh();
+                }}
                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
-                aria-label="Delete job"
+                aria-label="Remove from history"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

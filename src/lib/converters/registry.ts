@@ -1,4 +1,3 @@
-import "server-only";
 import type {
   Converter,
   ConverterId,
@@ -12,11 +11,11 @@ import { archiveConverter } from "./archive";
 import { linkConverter } from "./link";
 
 /**
- * Converter registry - the single place converters are wired in.
+ * Converter registry — the single place converters are wired in.
  *
- * To add a new converter: implement the `Converter` contract in a new file and
- * append it here. Detection + output discovery + execution all flow through
- * these helpers, so nothing else needs to change.
+ * To add a converter: implement the `Converter` contract in a new file and add
+ * it here. Output option ids are namespaced by converter ("image:webp",
+ * "pdf:jpg", "video:mp3", …) so routing an option to its converter is automatic.
  */
 
 export const converters: Converter[] = [
@@ -33,12 +32,10 @@ export function getConverter(id: ConverterId): Converter | undefined {
   return byId.get(id);
 }
 
-/** First converter that recognizes the input. */
 export function findConverter(input: DetectInput): Converter | undefined {
   return converters.find((c) => c.detect(input));
 }
 
-/** Aggregate every output option offered for an input, across all converters. */
 export function getAvailableOutputs(input: DetectInput): OutputOption[] {
   const seen = new Set<string>();
   const out: OutputOption[] = [];
@@ -53,13 +50,7 @@ export function getAvailableOutputs(input: DetectInput): OutputOption[] {
   return out;
 }
 
-/** Find which converter owns a given output option id. */
 export function converterForOutput(outputId: string): Converter | undefined {
   const prefix = outputId.split(":")[0] as ConverterId;
-  // Output ids are namespaced by converter ("image:webp", "pdf:jpg", …),
-  // except video/audio which both use the "video" converter.
-  const direct = byId.get(prefix);
-  if (direct) return direct;
-  // Fallback: scan options (rare).
-  return undefined;
+  return byId.get(prefix);
 }
