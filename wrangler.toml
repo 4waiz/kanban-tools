@@ -1,0 +1,20 @@
+# Cloudflare Worker (static assets) config for Kanban Tools.
+# https://developers.cloudflare.com/workers/static-assets/
+#
+# This serves the static `out/` export directly as Worker Assets - no Worker
+# script needed. `npx wrangler deploy` uploads out/ and Cloudflare serves it.
+#
+# The COOP/COEP + security headers required by ffmpeg.wasm come from
+# public/_headers, which Next copies into out/_headers; Worker Assets applies it.
+#
+# Use with:  npm run build  &&  npx wrangler deploy
+# The custom domain (tools.kanbanstudios.ae) stays attached to this Worker.
+
+name = "kanban-tools"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./out"
+# Serve clean URLs and fall back to 404.html for unknown paths.
+not_found_handling = "404-page"
+html_handling = "auto-trailing-slash"
