@@ -82,13 +82,21 @@ This deploys as a static site - no container, no server.
 
 1. Push this repo to GitHub (already at `github.com/4waiz/kanban-tools`).
 2. Cloudflare dashboard → **Workers & Pages → Create → Pages → Connect to Git**.
-3. Pick the repo, then set:
-   - **Framework preset:** Next.js (Static HTML Export) - or "None"
+3. Pick the repo, then set under **Build settings**:
+   - **Framework preset:** None (or "Next.js (Static HTML Export)")
    - **Build command:** `npm run build`
    - **Build output directory:** `out`
+   - **Deploy command:** leave **EMPTY**. Pages publishes the output directory
+     itself. (A non-empty deploy command like `npx wrangler deploy` will fail -
+     that's the Workers command, not Pages. Clear it in
+     **Settings → Build → Deploy command** if it was set.)
 4. Deploy. You get `https://kanban-tools.pages.dev`.
 
-### Option B - Direct upload
+> This project intentionally has **no `wrangler.toml`**. With Git integration,
+> Pages auto-detects the `out/` directory; a `wrangler.toml` makes the CI attempt
+> a wrangler-driven deploy instead, which is the wrong path for a static site.
+
+### Option B - Direct upload (manual)
 
 ```bash
 npm run build
