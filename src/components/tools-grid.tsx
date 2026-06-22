@@ -19,7 +19,11 @@ import {
   TOOL_CATEGORIES,
   type ToolDef,
 } from "@/lib/tools-catalog";
-import { fetchCapabilities } from "@/lib/client";
+import {
+  getBrowserCapabilities,
+  isOutputRunnable,
+  type BrowserCapabilities,
+} from "@/lib/capabilities";
 
 /** Resolve a lucide icon by name with a safe fallback. */
 function Icon({ name, className }: { name: string; className?: string }) {
@@ -32,13 +36,13 @@ function Icon({ name, className }: { name: string; className?: string }) {
 export function ToolsGrid() {
   const params = useSearchParams();
   const router = useRouter();
-  const [caps, setCaps] = React.useState<Record<string, boolean> | null>(null);
+  const [caps, setCaps] = React.useState<BrowserCapabilities | null>(null);
   const [active, setActive] = React.useState<ToolDef | null>(null);
 
   React.useEffect(() => {
-    fetchCapabilities()
-      .then((c) => setCaps(c.tools))
-      .catch(() => setCaps({}));
+    getBrowserCapabilities()
+      .then(setCaps)
+      .catch(() => setCaps(null));
   }, []);
 
   // Open a tool dialog if ?tool=slug is present.
@@ -59,10 +63,12 @@ export function ToolsGrid() {
     if (params.get("tool")) router.replace("/tools");
   }
 
-  function available(tool: ToolDef): boolean {
-    if (!tool.requires) return true;
-    if (!caps) return true; // optimistic until caps load
-    return caps[tool.requires] !== false;
+  function availability(tool: ToolDef): { ok: boolean; reason?: string } {
+    // Universal converter / multi-file tools have no single preset; always ok.
+    if (!tool.presetOutputId && !tool.link) return { ok: true };
+    if (tool.link) return { ok: false, reason: "Needs a server (CORS / yt-dlp)." };
+    if (!caps) return { ok: true }; // optimistic until caps load
+    return isOutputRunnable(tool.presetOutputId!, caps);
   }
 
   return (
@@ -79,7 +85,8 @@ export function ToolsGrid() {
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {tools.map((tool) => {
-                  const ok = available(tool);
+                  const avail = availability(tool);
+                  const ok = avail.ok;
                   return (
                     <button
                       key={tool.slug}
@@ -102,7 +109,7 @@ export function ToolsGrid() {
                           </h3>
                           {!ok && (
                             <Badge variant="secondary" className="gap-1">
-                              <Lock className="h-3 w-3" /> Unavailable
+                              <Lock className="h-3 w-3" /> Server only
                             </Badge>
                           )}
                         </div>
@@ -110,10 +117,9 @@ export function ToolsGrid() {
                           {tool.description}
                         </p>
                       </div>
-                      {!ok && (
+                      {!ok && avail.reason && (
                         <p className="text-[11px] text-muted-foreground">
-                          Requires a native tool that isn’t installed in this
-                          environment.
+                          {avail.reason}
                         </p>
                       )}
                     </button>
@@ -136,10 +142,7 @@ export function ToolsGrid() {
                 </DialogTitle>
                 <DialogDescription>{active.description}</DialogDescription>
               </DialogHeader>
-              <ConverterCard
-                presetOutputId={active.presetOutputId}
-                defaultMode={active.link ? "url" : "files"}
-              />
+              <ConverterCard presetOutputId={active.presetOutputId} />
             </>
           )}
         </DialogContent>

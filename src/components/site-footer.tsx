@@ -11,12 +11,12 @@ export function SiteFooter() {
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <Logo showWordmark={false} className="opacity-80" />
           <span>
-            Kanban Tools - local file conversion utility. Files auto-delete after
-            processing.
+            Kanban Tools - in-browser file conversion. Your files never leave
+            your device.
           </span>
         </div>
         <p className="text-[11px] font-semibold tracking-wide text-muted-foreground">
-          DOWNLOAD ONLY WHAT YOU HAVE THE RIGHT TO KEEP
+          100% CLIENT-SIDE · NO UPLOADS
         </p>
       </div>
     </footer>

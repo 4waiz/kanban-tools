@@ -5,20 +5,19 @@ import type { JobStatus, InputKind } from "./types";
 /**
  * Browser-local persistence for the "Recent jobs" list and user settings.
  *
- * Job tokens are stored here so the user can return to a result page after a
- * refresh. This is appropriate for a local/MVP single-user tool. In a real
- * multi-user product, jobs would be tied to an authenticated account server-side
- * and never persisted in localStorage.
+ * Recent jobs are DISPLAY-ONLY metadata (name, output, time). The actual result
+ * files live in memory as Blobs and are not persisted - once you leave or
+ * refresh, re-run the conversion. This keeps everything private and local with
+ * zero server involvement.
  */
 
-const JOBS_KEY = "kanban-tools.recent-jobs.v1";
+const JOBS_KEY = "kanban-tools.recent-jobs.v2";
 const SETTINGS_KEY = "kanban-tools.settings.v1";
 const MAX_RECENT = 25;
 
 export interface RecentJob {
   id: string;
-  token: string;
-  label: string; // primary file name or URL
+  label: string; // primary file name
   outputLabel?: string; // e.g. "WebP", "MP3"
   kind: InputKind;
   status: JobStatus;
@@ -76,13 +75,12 @@ export function clearRecentJobs() {
 }
 
 export interface AppSettings {
-  maxFileSizeMb: number;
-  jobTtlMinutes: number;
+  /** Default image output quality (0-100), applied as the param default. */
+  defaultQuality: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  maxFileSizeMb: 512,
-  jobTtlMinutes: 30,
+  defaultQuality: 80,
 };
 
 export function getSettings(): AppSettings {

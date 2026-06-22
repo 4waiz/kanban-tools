@@ -64,11 +64,21 @@ function kindFromMime(mime: string): InputKind {
   return "unknown";
 }
 
+/** Read `len` bytes from `b` starting at `offset` as an ASCII string. */
+function ascii(b: Uint8Array, offset: number, len: number): string {
+  let s = "";
+  for (let i = offset; i < offset + len && i < b.length; i++) {
+    s += String.fromCharCode(b[i]);
+  }
+  return s;
+}
+
 /**
  * Inspect leading bytes for a file signature. Returns a MIME if recognized.
- * Buffer should be at least the first ~16 bytes of the file.
+ * The buffer should hold at least the first ~16 bytes of the file. Accepts any
+ * Uint8Array (works in both Node and the browser).
  */
-export function sniffMagicBytes(buf: Buffer): string | null {
+export function sniffMagicBytes(buf: Uint8Array): string | null {
   if (buf.length < 4) return null;
   const b = buf;
 
@@ -92,7 +102,7 @@ export function sniffMagicBytes(buf: Buffer): string | null {
     b.length >= 12 &&
     b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46
   ) {
-    const tag = b.toString("ascii", 8, 12);
+    const tag = ascii(b, 8, 4);
     if (tag === "WEBP") return "image/webp";
     if (tag === "WAVE") return "audio/wav";
     if (tag === "AVI ") return "video/x-msvideo";
@@ -102,7 +112,7 @@ export function sniffMagicBytes(buf: Buffer): string | null {
     b.length >= 12 &&
     b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70
   ) {
-    const brand = b.toString("ascii", 8, 12);
+    const brand = ascii(b, 8, 4);
     if (brand.startsWith("avif") || brand.startsWith("avis"))
       return "image/avif";
     if (brand.startsWith("heic") || brand.startsWith("heif") || brand.startsWith("mif1"))
@@ -140,7 +150,7 @@ export interface DetectResult {
 export function detectType(
   filename: string,
   clientMime?: string,
-  head?: Buffer,
+  head?: Uint8Array,
 ): DetectResult {
   const ext = getExtension(filename);
 

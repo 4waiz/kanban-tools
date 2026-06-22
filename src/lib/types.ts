@@ -1,12 +1,12 @@
 /**
- * Shared domain types for Kanban Tools.
+ * Shared domain types for Kanban Tools (browser edition).
  *
- * These describe the contract between the plugin converters, the job manager,
- * and the API/UI layers. Keeping them in one place makes the converter system
- * easy to extend without circular imports.
+ * Everything runs client-side: converters take the user's File objects, do the
+ * work in the browser (Canvas / pdf.js / ffmpeg.wasm / fflate), and return Blob
+ * artifacts the user downloads. No server, no filesystem, no job tokens.
  */
 
-/** Lifecycle of a conversion job. */
+/** Lifecycle of a conversion job (client-side, in-memory). */
 export type JobStatus = "pending" | "processing" | "completed" | "failed";
 
 /** Broad input categories the app understands. */
@@ -21,22 +21,20 @@ export type InputKind =
 
 /**
  * A single selectable output format/operation for a given input.
- * `id` is what the client sends back to /api/convert; it's converter-defined.
+ * `id` is namespaced by converter, e.g. "image:webp", "pdf:jpg", "video:mp3".
  */
 export interface OutputOption {
-  /** Stable identifier, e.g. "image:webp", "pdf:jpg", "video:mp3". */
   id: string;
-  /** Short label shown in the dropdown, e.g. "WebP". */
   label: string;
-  /** Optional longer description / hint. */
   description?: string;
-  /** Which converter handles this option. */
   converter: ConverterId;
-  /**
-   * Optional declarative parameters this option accepts (width, quality, …).
-   * The UI renders simple controls for these; convert() reads job.params.
-   */
+  /** Declarative parameters this option accepts (width, quality, …). */
   params?: OutputParamSpec[];
+  /**
+   * If set, this option is native-only (PDF→SVG, PDF compress, link download)
+   * and cannot run in the browser. The UI shows it disabled with this reason.
+   */
+  unavailableReason?: string;
 }
 
 export type OutputParamSpec =
@@ -66,103 +64,66 @@ export type OutputParamSpec =
 
 export type ConverterId = "image" | "pdf" | "video" | "archive" | "link";
 
-/** Lightweight description of an uploaded input file. */
-export interface InputFileInfo {
-  /** Sanitized base name actually stored on disk (no path components). */
-  storedName: string;
-  /** Original client-provided file name (display only, never used for fs). */
-  originalName: string;
-  /** Best-guess MIME type. */
-  mime: string;
-  /** Lowercased extension without the dot, e.g. "png". */
-  ext: string;
-  /** Size in bytes. */
-  size: number;
-}
-
-/** A produced output artifact living in the job's `output/` directory. */
-export interface OutputFileInfo {
-  /** File name within the job output dir. */
+/** A produced output artifact (lives in memory as a Blob). */
+export interface OutputArtifact {
   name: string;
-  size: number;
+  blob: Blob;
   mime: string;
+  size: number;
 }
 
-/** Persisted job record (also written to metadata.json in the job dir). */
-export interface Job {
-  id: string;
-  /**
-   * Per-job secret token. Required to download/delete the job's files so that
-   * knowing a job id alone is not enough to read someone else's output.
-   * PRODUCTION UPGRADE: tie this to an authenticated session/user id.
-   */
-  token: string;
-  status: JobStatus;
-  createdAt: number;
-  updatedAt: number;
-  /** 0–100 progress for the active operation (best-effort). */
-  progress: number;
-  /** Chosen output option id (set when conversion starts). */
-  outputId?: string;
-  /** Free-form parameters for the operation (width, quality, url, …). */
-  params: Record<string, string | number | boolean>;
-  inputs: InputFileInfo[];
-  outputs: OutputFileInfo[];
-  /**
-   * If multiple outputs were produced they are zipped; this is the zip name in
-   * the output dir (download serves this single file).
-   */
-  bundleName?: string;
-  /** Human-readable error message when status === "failed". */
-  error?: string;
-  /** Detected input kind for the primary input. */
-  inputKind: InputKind;
-  /**
-   * Opaque client identifier (hashed IP) that created the job. Used only for
-   * per-client concurrency limits and never exposed to other clients.
-   */
-  clientKey?: string;
-}
-
-/** What a converter receives to do its work. */
-export interface ConvertContext {
-  job: Job;
-  /** Absolute path to this job's root dir. */
-  jobDir: string;
-  /** Absolute path to the input dir (uploaded files live here). */
-  inputDir: string;
-  /** Absolute path to the output dir (write results here). */
-  outputDir: string;
-  /** Report progress 0–100 (best-effort, throttled by caller). */
-  onProgress: (pct: number) => void;
-}
-
-/** Result returned by a converter's convert(). */
-export interface ConvertResult {
-  outputs: OutputFileInfo[];
-}
-
-/**
- * The plugin contract. Every file under src/lib/converters/*.ts implements this.
- * Adding a new converter is: implement this + register it in registry.ts.
- */
-export interface Converter {
-  id: ConverterId;
-  /** Does this converter recognize the given input? (by mime/ext/kind) */
-  detect(input: DetectInput): boolean;
-  /** Output options for a recognized input. */
-  getAvailableOutputs(input: DetectInput): OutputOption[];
-  /** Perform the conversion for the chosen job.outputId. */
-  convert(ctx: ConvertContext): Promise<ConvertResult>;
-}
-
-/** Minimal info needed for detection (works for files and links). */
+/** Minimal info needed for detection. */
 export interface DetectInput {
   kind: InputKind;
   mime: string;
   ext: string;
-  /** Present for link inputs. */
   url?: string;
-  /** Number of input files (some options only apply to multiples). */
   fileCount: number;
+}
+
+export type ParamValue = string | number | boolean;
+
+/** What a browser converter receives to do its work. */
+export interface ConvertContext {
+  /** The user's selected files (already in memory). */
+  files: File[];
+  /** The chosen output option id. */
+  outputId: string;
+  /** Operation parameters (width, quality, fps, …). */
+  params: Record<string, ParamValue>;
+  /** Report progress 0–100 (best-effort). */
+  onProgress: (pct: number) => void;
+  /** Optional status text shown under the progress bar (e.g. "Loading FFmpeg…"). */
+  onStatus?: (text: string) => void;
+}
+
+export interface ConvertResult {
+  outputs: OutputArtifact[];
+}
+
+/**
+ * The plugin contract. Every file under src/lib/converters/*.ts implements this.
+ * Adding a converter is: implement this + register it in registry.ts.
+ */
+export interface Converter {
+  id: ConverterId;
+  detect(input: DetectInput): boolean;
+  getAvailableOutputs(input: DetectInput): OutputOption[];
+  convert(ctx: ConvertContext): Promise<ConvertResult>;
+}
+
+/** Lightweight client-side job record (no tokens, no server persistence). */
+export interface ClientJob {
+  id: string;
+  status: JobStatus;
+  createdAt: number;
+  progress: number;
+  statusText?: string;
+  outputId?: string;
+  inputKind: InputKind;
+  inputs: { name: string; size: number; mime: string }[];
+  outputs: OutputArtifact[];
+  /** When >1 output, they're zipped into this single bundle. */
+  bundle?: OutputArtifact;
+  error?: string;
 }

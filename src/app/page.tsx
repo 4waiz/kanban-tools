@@ -31,12 +31,12 @@ export default function HomePage() {
           <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">
             Convert anything. Compress anything.
             <br className="hidden sm:block" />
-            <span className="text-primary"> Download what you’re allowed to keep.</span>
+            <span className="text-primary"> Right in your browser.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-pretty text-base text-muted-foreground sm:text-lg">
-            Drop a file or paste a link. Kanban Tools detects the type, shows what’s
-            possible, and hands you a clean, downloadable result - fast, private,
-            and auto-cleaned.
+            Drop a file - Kanban Tools detects the type, shows what’s possible, and
+            hands you a clean, downloadable result. Everything runs locally on your
+            device; your files are never uploaded.
           </p>
         </section>
 
@@ -79,9 +79,9 @@ export default function HomePage() {
 
 function FeatureStrip() {
   const items = [
-    { icon: Zap, label: "Fast, local processing" },
-    { icon: ShieldCheck, label: "Rights-respecting downloads" },
-    { icon: Trash2, label: "Auto-deletes your files" },
+    { icon: Zap, label: "Fast, on-device processing" },
+    { icon: ShieldCheck, label: "Files never leave your browser" },
+    { icon: Trash2, label: "Nothing stored on a server" },
   ];
   return (
     <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
